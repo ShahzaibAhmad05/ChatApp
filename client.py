@@ -3,8 +3,6 @@ import threading
 import sys
 import queue
 
-#this client connects to the chat server, registers a username, and supports broadcast/unicast plus '/quit'
-
 ENCODING = "utf-8"
 RECV_BUFSIZE = 4096
 
@@ -30,13 +28,14 @@ def recv_loop(conn: socket.socket, stop_q: queue.Queue) -> None:
 
 
 def main():
-    #this reads host, port, and desired username from cli or prompts
+    #optional cmd line args for host and port
     if len(sys.argv) >= 3:
         host, port = sys.argv[1], int(sys.argv[2])
     else:
-        host = input("server host [127.0.0.1]: ").strip() or "127.0.0.1"
+        host = input("Enter server host IP address: ").strip()
+        port = input(f"Enter server port for [{host}]: ").strip()
         try:
-            port = int(input("server port [55555]: ").strip() or "55555")
+            port = int(port)
         except ValueError:
             print("[error] invalid port")
             return
@@ -48,7 +47,7 @@ def main():
         print(f"[error] could not connect: {e}")
         return
 
-    #this print initial server greeting and send username
+    #print initial server greeting and send username
     try:
         greeting = sock.recv(RECV_BUFSIZE).decode(ENCODING).strip()
         if greeting:
@@ -70,7 +69,7 @@ def main():
         sock.close()
         return
 
-    #this read server response
+    #read server response
     try:
         response = sock.recv(RECV_BUFSIZE).decode(ENCODING).strip()
         if response.startswith("[error]"):
@@ -88,9 +87,9 @@ def main():
     t = threading.Thread(target=recv_loop, args=(sock, stop_q), daemon=True)
     t.start()
 
-    print("tips: type messages and press enter to chat.")
-    print("tips: private dm with '@username your message'.")
-    print("tips: type '/quit' to leave.\n")
+    print("tip: type messages and press enter to chat")
+    print("tip: use private dm with @username")
+    print("tip: type '/quit' to leave\n")
 
     try:
         while stop_q.empty():
