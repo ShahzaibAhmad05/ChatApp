@@ -2,6 +2,7 @@ import socket
 import threading
 import sys
 import queue
+import os
 
 ENCODING = "utf-8"
 RECV_BUFSIZE = 4096
@@ -18,6 +19,7 @@ def recv_loop(conn: socket.socket, stop_q: queue.Queue) -> None:
             for line in data.decode(ENCODING).splitlines():
                 if line.strip():
                     print(line)
+            print() #print a newline after messages
     except Exception:
         print("[error] receive loop ended unexpectedly")
     finally:
@@ -28,18 +30,10 @@ def recv_loop(conn: socket.socket, stop_q: queue.Queue) -> None:
 
 
 def main():
-    #optional cmd line args for host and port
-    if len(sys.argv) >= 3:
-        host, port = sys.argv[1], int(sys.argv[2])
-    else:
-        host = input("Enter server host IP address: ").strip()
-        port = input(f"Enter server port for [{host}]: ").strip()
-        try:
-            port = int(port)
-        except ValueError:
-            print("[error] invalid port")
-            return
+    #set values for the local host and port
+    host, port = "127.0.0.1", 55555
 
+    print("[proc] connecting to chat server...")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         sock.connect((host, port))
@@ -47,8 +41,7 @@ def main():
         print(f"[error] could not connect: {e}")
         return
 
-    #print initial server greeting and send username
-    try:
+    try:        #print initial server greeting and send username
         greeting = sock.recv(RECV_BUFSIZE).decode(ENCODING).strip()
         if greeting:
             print(greeting)
@@ -57,7 +50,7 @@ def main():
         sock.close()
         return
 
-    username = input("username: ").strip()
+    username = input("\nUsername: ").strip()
     if not username:
         print("[error] empty username not allowed")
         sock.close()
@@ -69,8 +62,7 @@ def main():
         sock.close()
         return
 
-    #read server response
-    try:
+    try:        #read server response
         response = sock.recv(RECV_BUFSIZE).decode(ENCODING).strip()
         if response.startswith("[error]"):
             print(response)
@@ -82,19 +74,26 @@ def main():
         sock.close()
         return
 
-    #this start receiver thread
+    #start receiver thread
     stop_q: queue.Queue = queue.Queue()
     t = threading.Thread(target=recv_loop, args=(sock, stop_q), daemon=True)
     t.start()
 
+    os.system("cls")
+    print("------------------------- Chat -------------------------")
+    print("--------------------------------------------------------")
+    print()
     print("tip: type messages and press enter to chat")
     print("tip: use private dm with @username")
-    print("tip: type '/quit' to leave\n")
-
+    print("tip: type '/quit' to leave")
+    print()
+    print("--------------------------------------------------------")
+    print()
     try:
         while stop_q.empty():
             try:
                 line = input()
+                print("\033[1A\033[2K\033[1A")  #clear the input line
             except EOFError:
                 line = "/quit"
             line = (line or "").strip()
