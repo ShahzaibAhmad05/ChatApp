@@ -3,19 +3,16 @@ import threading
 import sys
 from typing import Dict, Tuple
 
-#this server implements a threaded multi-client chat with broadcast and unicast (@username ...)
-#this also announces join/leave events and handles graceful disconnects and invalid input
-
 HOST = "127.0.0.1"
 PORT = 55555
 ENCODING = "utf-8"
 BACKLOG = 100
 RECV_BUFSIZE = 4096
 
-#this lock protects shared state across client threads
+#lock to protect shared state across client threads
 clients_lock = threading.Lock()
 
-#this mapping keeps track of active clients {username: (conn, addr)}
+#dict to keep track of active clients
 clients: Dict[str, Tuple[socket.socket, Tuple[str, int]]] = {}
 
 
@@ -23,13 +20,12 @@ def send_line(conn: socket.socket, line: str) -> None:
     #this helper sends a single line to a client with newline delimiter
     try:
         conn.sendall((line + "\n").encode(ENCODING))
-    except Exception:
-        #this swallow send errors; caller handles cleanup
-        pass
+    except Exception:   
+        pass    #ignore send errors
 
 
 def broadcast(system_line: str, exclude: str = "") -> None:
-    #this publish-subscribe style broadcast sends a system/user message to all subscribers (all clients)
+    #sends a system or user message to all clients
     with clients_lock:
         for uname, (c, _) in list(clients.items()):
             if uname == exclude:
@@ -37,7 +33,7 @@ def broadcast(system_line: str, exclude: str = "") -> None:
             send_line(c, system_line)
 
 
-def send_private(sender: str, recipient: str, message: str) -> None:
+def send_private_message(sender: str, recipient: str, message: str) -> None:
     #this routes a private message from sender to recipient and echos confirmation to sender
     with clients_lock:
         if recipient not in clients:
@@ -47,7 +43,7 @@ def send_private(sender: str, recipient: str, message: str) -> None:
             return
         rc_conn, _ = clients[recipient]
         sd_conn, _ = clients[sender]
-    send_line(rc_conn, f"[pm][from {sender}] {message}")
+    send_line(rc_conn, f"[pm][from {sender}] {message}")    #personal message
     send_line(sd_conn, f"[pm][to {recipient}] {message}")
 
 
@@ -74,46 +70,42 @@ def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
         send_line(conn, f"[ok] joined as '{username}'. type '/quit' to leave. use '@user message' for private dm.")
         broadcast(f"[notice] {username} has joined the chat", exclude=username)
 
-        #this main loop processes chat lines
+        #main loop that processes chat lines
+        #for every client
         while True:
             data = conn.recv(RECV_BUFSIZE)
-            if not data:
-                #this handles abrupt disconnect
+            if not data:            #disconnect
                 break
             line = data.decode(ENCODING).rstrip("\n").strip()
             if not line:
                 continue
 
-            if line == "/quit":
-                #this graceful exit path
+            if line == "/quit":     #exit
                 send_line(conn, "[ok] goodbye")
                 break
 
             if line.startswith("@"):
-                #this unicast: expected format '@username message'
-                parts = line.split(maxsplit=1)
+                parts = line.split(maxsplit=1)  #unicast: expected format '@username message'
                 if len(parts) < 2:
                     send_line(conn, "[error] private message format: @username your message")
-                    continue
+                    continue    #skip this iteration
                 target = parts[0][1:]
                 if not target:
                     send_line(conn, "[error] missing recipient username after '@'")
                     continue
                 msg = parts[1]
-                send_private(username, target, msg)
+                send_private_message(username, target, msg)
             else:
-                #this broadcast: echo to all (including sender for consistency)
+                #broadcast to all clients including sender
                 broadcast(f"[all][{username}] {line}")
-    except ConnectionResetError:
-        #this handles sudden client drop
+    except ConnectionResetError:    #sudden client drop
         pass
     except Exception as e:
         try:
             send_line(conn, f"[error] server exception: {e}")
         except Exception:
             pass
-    finally:
-        #this cleanup removes user and notifies others
+    finally:    #cleanup on client disconnect
         if username:
             with clients_lock:
                 if username in clients:
