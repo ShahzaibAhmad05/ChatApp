@@ -51,7 +51,7 @@ def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
     #this thread manages registration then message loop for a single client
     username = None
     try:
-        send_line(conn, "welcome to the chat server. please enter a unique username:")
+        send_line(conn, "welcome to the chat server. please enter a unique username: ")
         raw = conn.recv(RECV_BUFSIZE).decode(ENCODING).strip()
         if not raw:
             send_line(conn, "[error] empty username not allowed")
