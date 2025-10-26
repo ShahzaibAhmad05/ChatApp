@@ -2,6 +2,12 @@
 
 A real-time terminal-based chat application with support for private messaging, colorized usernames, and an interactive UI. Built with Python's socket programming and threading capabilities.
 
+
+<p align="center">
+  <img src="https://drive.google.com/uc?export=view&id=1vf97o171y5yqfPumLRvqNh4uxROoG4B0" alt="Chat App Screenshot" width="600"/>
+</p>
+
+
 ## Features
 
 - 🌐 Real-time group chat
