@@ -27,7 +27,7 @@ def recv_loop(conn: socket.socket) -> None:
             #if the msg is from the current user, mention (You)
             if USERNAME in recv_msg.splitlines()[0]:
                 recv_msg = recv_msg.replace(USERNAME, USERNAME + " (You)", 1)
-            else:   #if the msg is not the user's own
+            elif not CHAT_PAUSE_FLAG:   #if the msg is not the user's own
                 print(recv_msg)
             chatHistory.append(recv_msg)
 
