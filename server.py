@@ -20,7 +20,7 @@ ANSI_COLORS = [
     "\033[95m",  # magenta
     "\033[96m",  # cyan
 ]
-COLOR_DM = "\033[97m"   # bright white
+COLOR_DM = "\033[95;1m"  # bold magenta
 COLOR_RESET = "\033[0m"
 
 #lock to protect shared state across client threads
@@ -30,9 +30,8 @@ clients_lock = threading.Lock()
 clients: Dict[str, Tuple[socket.socket, Tuple[str, int]]] = {}
 
 
-# helper function to assign a random color to a user
+#helper function to assign a random color to a user
 def random_ansi_color():
-    #choose a random color from the list
     return random.choice(ANSI_COLORS)
 
 
@@ -40,8 +39,8 @@ def send_line(conn: socket.socket, line: str) -> None:
     #this helper sends a single line to a client with newline delimiter
     try:
         conn.sendall((line + "\n").encode(ENCODING))
-    except Exception:   
-        pass    #ignore send errors
+    except Exception:
+        pass  #ignore send errors
 
 
 def broadcast(system_line: str, exclude: str = "") -> None:
@@ -53,7 +52,7 @@ def broadcast(system_line: str, exclude: str = "") -> None:
             send_line(c, system_line)
 
 
-def send_private_message(sender: str, recipient: str, message: str, name_color: str, ) -> None:
+def send_private_message(sender: str, recipient: str, message: str, name_color: str) -> None:
     #this routes a private message from sender to recipient and echos confirmation to sender
     with clients_lock:
         if recipient not in clients:
@@ -63,12 +62,13 @@ def send_private_message(sender: str, recipient: str, message: str, name_color: 
             return
         rc_conn, _ = clients[recipient]
         sd_conn, _ = clients[sender]
-        
+
     #show different formatting for sender and recipient
-    send_line(rc_conn, 
-        f"{COLOR_DM}DM{COLOR_RESET} from {name_color}{sender}{COLOR_RESET} \n{message}")
-    send_line(sd_conn, 
-        f"{COLOR_DM}DM{COLOR_RESET} to {recipient} \n{message}")
+    send_line(
+        rc_conn,
+        f"{COLOR_DM}DM{COLOR_RESET} from {name_color}{sender}{COLOR_RESET} \n{message}",
+    )
+    send_line(sd_conn, f"{COLOR_DM}DM{COLOR_RESET} to {recipient} \n{message}")
 
 
 def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
@@ -77,7 +77,8 @@ def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
     try:
         send_line(conn, "welcome to the chat server. please enter a unique username: ")
         raw = conn.recv(RECV_BUFSIZE).decode(ENCODING).strip()
-        if not raw:     #extra error handling
+        if not raw:
+            #extra error handling
             send_line(conn, "[error] empty username not allowed")
             conn.close()
             return
@@ -98,42 +99,46 @@ def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
         user_color = random_ansi_color()
 
         #main loop that processes chat lines
-        #for every client
         while True:
             data = conn.recv(RECV_BUFSIZE)
-            if not data:            #disconnect
+            if not data:
+                #disconnect
                 break
             line = data.decode(ENCODING).rstrip("\n").strip()
             if not line:
                 continue
 
-            if line == "/quit":     #exit
+            if line == "/quit":
+                #exit
                 send_line(conn, "[ok] goodbye")
                 break
 
             if line.startswith("@"):
-                parts = line.split(maxsplit=1)  #unicast -> expected format '@username message'
+                parts = line.split(maxsplit=1)
+                #unicast -> expected format '@username message'
                 if len(parts) < 2:
                     send_line(conn, "[error] private message format: @username")
-                    continue    #skip this iteration
+                    continue
                 target = parts[0][1:]
                 if not target:
                     send_line(conn, "[error] missing recipient username after '@'")
                     continue
                 msg = parts[1]
-                send_private_message(username, target, msg)
+                send_private_message(username, target, msg, user_color)
             else:
                 #broadcast to all clients including sender
                 timestamp = datetime.now().strftime("%I:%M%p").lstrip("0")
                 broadcast(f"{user_color}{username}{COLOR_RESET} at {timestamp} \n{line}")
-    except ConnectionResetError:    #sudden client drop
+    except ConnectionResetError:
+        #sudden client drop
         pass
     except Exception as e:
         try:
             send_line(conn, f"[error] server exception: {e}")
         except Exception:
             pass
-    finally:    #cleanup on client disconnect
+    finally:
+        #cleanup on client disconnect
         if username:
             with clients_lock:
                 if username in clients:
@@ -148,8 +153,8 @@ def handle_client(conn: socket.socket, addr: Tuple[str, int]) -> None:
                     del clients[username]
             broadcast(f"[notice] {username} has left the chat")
 
-#main function for serving clients
 
+#main function for serving clients
 def serve(host: str = HOST, port: int = PORT) -> None:
     #starts the tcp server and accepts new clients
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
