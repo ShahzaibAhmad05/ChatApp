@@ -27,9 +27,7 @@ def recv_loop(conn: socket.socket) -> None:
             #if the msg is from the current user, mention (You)
             if USERNAME in recv_msg.splitlines()[0]:
                 recv_msg = recv_msg.replace(USERNAME, USERNAME + " (You)", 1)
-
-            #refresh the chat if the user is not in typing mode
-            if not CHAT_PAUSE_FLAG:
+            else:   #if the msg is not the user's own
                 print(recv_msg)
             chatHistory.append(recv_msg)
 
@@ -110,7 +108,7 @@ def main():
         return
 
     #get the username
-    USERNAME = input("\nEnter username: ").strip()
+    USERNAME = input("\nEnter username (without spaces): ").strip()
     if not USERNAME:
         print("[error] empty username not allowed")
         sock.close()
